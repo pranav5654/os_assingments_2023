@@ -4,46 +4,79 @@ Elf32_Ehdr *ehdr;
 Elf32_Phdr *phdr;
 int fd;
 
-/*
- * release memory and other cleanups
- */
+int (*strt_ptr)();
+
 void loader_cleanup() {
-  
+    free(ehdr);
+    free(phdr);
+    close(fd);
 }
 
-/*
- * Load and run the ELF executable file
- */
-void load_and_run_elf(char** exe) {
+
+void load_and_run_elf(char** argv) {
+
   fd = open(argv[1], O_RDONLY);
-  // 1. Load entire binary content into the memory from the ELF file.
-  // 2. Iterate through the PHDR table and find the section of PT_LOAD 
-  //    type that contains the address of the entrypoint method in fib.c
-  // 3. Allocate memory of the size "p_memsz" using mmap function 
-  //    and then copy the segment content
-  // 4. Navigate to the entrypoint address into the segment loaded in the memory in above step
-  // 5. Typecast the address to that of function pointer matching "_start" method in fib.c.
-  // 6. Call the "_start" method and print the value returned from the "_start"
-  int result = _start();
-  printf("User _start return value = %d\n",result);
-}
 
+  ehdr = (Elf32_Ehdr *)malloc(sizeof(Elf32_Ehdr));
 
-int main(int argc, char** argv) 
-{
-  if(argc != 2) {
-    printf("Usage: %s <ELF Executable> \n",argv[0]);
+  int ehdr_error_code = read(fd, ehdr, sizeof(Elf32_Ehdr));
+
+  if(ehdr_error_code == -1) {
+    printf("Error reading ELF header\n");
     exit(1);
   }
 
-  fd =  open(argv[1], O_RDONLY);
-  if(fd == -1) {
-    printf("File  %s cannot be opened  , error code %d\n",argv[1] , fd);
-    exit(1);
+  Elf32_Addr entry_point = ehdr->e_entry;
+  Elf32_Off pht_offset = ehdr->e_phoff;
+  Elf32_Half pht_size_of_each = ehdr->e_phentsize;
+  Elf32_Half pht_num_entries = ehdr->e_phnum;
+
+  
+  phdr = (Elf32_Phdr*)malloc(sizeof(Elf32_Phdr));
+
+  for (int i = 0; i < (int)pht_num_entries; i++)
+  {
+    lseek(fd,pht_offset + i*pht_size_of_each,SEEK_SET);
+
+
+    int phdr_error_code = read(fd, phdr, sizeof(Elf32_Phdr));
+
+    if(phdr_error_code == -1) {
+      printf("Error reading Program header number %d\n" , i+1);
+      exit(1);
+    }
+
+    if(phdr->p_type == PT_LOAD){
+      if( phdr->p_vaddr < entry_point &&  entry_point < phdr->p_vaddr + phdr->p_memsz){
+
+        unsigned int *segment_mem = mmap(NULL , phdr->p_memsz, PROT_READ |PROT_EXEC  , MAP_SHARED ,fd , phdr->p_offset);
+
+        if(segment_mem == MAP_FAILED){
+          printf("%s\n", "Memory could not be mapped.\n");
+          exit(1);
+        }
+
+        unsigned int  offset = entry_point - phdr->p_vaddr;
+        void *  real_entry_point = (char *)segment_mem + offset;
+
+
+        strt_ptr  = real_entry_point;
+        int result = strt_ptr();
+
+        printf("User _start return value = %d\n",result);
+
+
+        munmap(segment_mem, phdr->p_memsz);
+
+        
+        break;
+      }
+      
+      }
+
   }
-  
-  load_and_run_elf(argv); 
-  loader_cleanup();
-  
-  return 0;
-}
+  }
+
+
+
+
