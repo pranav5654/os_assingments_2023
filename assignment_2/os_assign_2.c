@@ -20,6 +20,7 @@ struct prompt * head = NULL;
 struct prompt * tail = NULL;
 int num =0;
 
+void run_sh(char * command);
 int create_n_run_pipe(char * command);
 int create_n_run_pipes(char * command);
 static void my_handler(int signum);
@@ -59,6 +60,9 @@ void shell_loop(){
     {
         printf("\033[1;35mOS_assignment_2\033[0m$ ");
         fgets(command , 1024 ,stdin);  // getting input
+        if(strcmp(command , "\n") == 0 || strcmp(command , " \n") == 0){
+            continue;
+        }
         command[strlen(command) -1] = '\0'; // removing the newlinr character from the input
 
         // exit condition
@@ -79,7 +83,6 @@ void shell_loop(){
 
 
 int launch(char * command){
-
     // launches the create_n_run function for creating a child process.
     int status;
     int count =0;
@@ -93,7 +96,8 @@ int launch(char * command){
     for (int i = 0; i < strlen(command) -2; i++)
     {
         if(command[i] =='.' && command[i+1] == 's' && command[i+2] == 'h'){
-            count =2 ;
+            run_sh(command);
+            return 1;
         }
     }
     
@@ -246,18 +250,49 @@ static void my_handler(int signum) {
 
 
 int create_n_run_pipes(char * command){
-    FILE *fp;
-    char words[1024];
-
-    // Open a pipe to a command
-    fp = popen(command, "r");
-    while (fgets(words, sizeof(words), fp) != NULL) {
-        printf("%s", words);
+    int status  =fork();
+    
+    if(status < 0){
+        printf("%s\n", "Something went wrong");
+        printf("%s\n", "Fork failed.");                     // gives an output to console 
     }
-    // closing the file pointer
-    pclose(fp);
-}
+    else if(status ==0){
+    // getting the file pointer
+        FILE *fp;
+        char words[1024];
 
+        // Open a pipe to a command
+        fp = popen(command, "r");
+        while (fgets(words, sizeof(words), fp) != NULL) {
+            printf("%s", words);
+        }
+        // closing the file pointer
+        pclose(fp);
+        exit(0);
+
+    }else{
+        int ret;
+        time_t s_timer;
+        time_t e_timer;
+        time(&s_timer);
+        wait(&ret); // waiting for the child
+        time(&e_timer);
+        int exec_time = e_timer - s_timer;
+
+        // prints the exit code of the child if it terminated correctly
+        if (WIFEXITED(ret)) {
+            printf("EXIT CODE of the CHILD: %d\n", WEXITSTATUS(ret));
+            
+        }
+
+        // storing the history of the command
+        time_t t;
+        time(&t);
+        char * timee = ctime(&t);
+        timee[strlen(timee) -1] = '\0';    
+        history(command , status , timee , exec_time*1000);
+    }
+}
 
 int create_n_run_pipe(char * command){
     int fd[2];
@@ -358,21 +393,79 @@ int create_n_run_pipe(char * command){
         exit(0);
         }
 
-
-
-
-
         else{
             // parent process
+            int ret;
+
             close(fd[0]);
             close(fd[1]);
-            wait(NULL);
-            wait (NULL);
-        }
+            time_t s_timer;
+            time_t e_timer;
+            time(&s_timer);
+            wait(&ret);
+            wait(&ret);
+            time(&e_timer);
+            int exec_time = e_timer - s_timer;
+
+            // prints the exit code of the child if it terminated correctly
+            if (WIFEXITED(ret)) {
+                printf("EXIT CODE of the CHILD: %d\n", WEXITSTATUS(ret));
+                
+            }
+
+            // storing the history of the command
+            time_t t;
+            time(&t);
+            char * timee = ctime(&t);
+            timee[strlen(timee) -1] = '\0';    
+            history(command , status , timee , exec_time*1000);
+            }
     }
     
     return 0;
 
 }
 
+void run_sh(char * command){
+    int status  =fork();
 
+    if(status < 0){
+        printf("%s\n", "Something went wrong");
+        printf("%s\n", "Fork failed.");                     // gives an output to console 
+    }
+    else if(status ==0){
+    // getting the file pointer
+        FILE * f = fopen(command , "r");       
+        if(f == NULL){
+            printf("Invalid Input!!!\n");     // gives an output to console 
+            exit(1);
+        }
+        char line[1024];
+        while(fgets(line , 1024 , f) != NULL){
+            system(line);
+        }
+        exit(0);
+
+    }else{
+        int ret;
+        time_t s_timer;
+        time_t e_timer;
+        time(&s_timer);
+        wait(&ret); // waiting for the child
+        time(&e_timer);
+        int exec_time = e_timer - s_timer;
+
+        // prints the exit code of the child if it terminated correctly
+        if (WIFEXITED(ret)) {
+            printf("EXIT CODE of the CHILD: %d\n", WEXITSTATUS(ret));
+            
+        }
+
+        // storing the history of the command
+        time_t t;
+        time(&t);
+        char * timee = ctime(&t);
+        timee[strlen(timee) -1] = '\0';    
+        history(command , status , timee , exec_time*1000);
+    }
+}
