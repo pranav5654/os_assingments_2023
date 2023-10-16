@@ -32,17 +32,6 @@ struct pcb{
 
 
 
-// need to to do all the error checkign ---------------- done
-// default priority 1 ---------------------------------- done
-// priority queue -------------------------------------- done
-// add original shell code ----------------------------- done 
-// cant quit if all the processes havent endede -------- done --- need to update if commands can run in between
-// histrory -------------------------------------------- done
-// need to change the ctrl c functionality ------------- done
-// add return to all the perror ------------------------ done
-// add waittime ---------------------------------------- done
-// if adding process while something is running.
-
 
 struct prompt * head = NULL;
 struct prompt * tail = NULL;
@@ -247,8 +236,6 @@ void scheduler(){
         
 }
 
-
-
 void shell_loop(){
 
     char command[1024];
@@ -273,12 +260,10 @@ void shell_loop(){
             flag =1;
         }
 
-        
         else{
             int status = create_n_run(command);
         }
-        
-        
+
     } while (1);
 }
 
@@ -339,8 +324,9 @@ int create_n_run(char * command){
             k = atoi(arguments[2]);
         }
         else if(i==2) k=1;
-
+        
         struct pcb*temp = new_process(arguments[1] , k);
+        
         sem_wait(&shared->mutex);   
         shared->head = temp;
         sem_post(&shared->mutex);     
@@ -350,8 +336,6 @@ int create_n_run(char * command){
         timee[strlen(timee) -1] = '\0'; 
 
         history(c_temp , -1 ,-1, timee , 0 ,0);
-
-
         return 0;
     }
     
@@ -467,7 +451,7 @@ void print_history(){
 
 struct pcb* push(struct pcb * process)  
 {  
-    int p =process->priority;
+    int p = process->priority;
     struct pcb * temp;
     sem_wait(&shared->mutex);  
     temp  = shared->head;
@@ -479,6 +463,7 @@ struct pcb* push(struct pcb * process)
         sem_wait(&shared->mutex);   
         shared->head = process;
         sem_post(&shared->mutex);      
+        return process;
 
     }  
     else {  
