@@ -1,1 +1,2 @@
 To run the file , just compile your required executables and then pass them as arguments to the submit command along with the priority .
+Run the shared mem executable seprately to start the shared memory.
